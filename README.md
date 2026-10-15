@@ -46,6 +46,18 @@ Contoh properti fitur:
 Dataset dapat dibuka menggunakan aplikasi yang mendukung GeoJSON, seperti
 QGIS, ArcGIS, geojson.io, atau pustaka pemetaan berbasis web.
 
+### Menjalankan peta rute
+
+Repositori ini menyediakan [`index.html`](./index.html) untuk menampilkan peta
+rute PPM ke ULBI menggunakan Leaflet.js. Karena browser biasanya memblokir
+`fetch` dari file lokal, jalankan server lokal dari folder repositori, misalnya:
+
+```powershell
+python -m http.server 8000
+```
+
+Kemudian buka <http://localhost:8000> di browser.
+
 Contoh pemuatan menggunakan Leaflet:
 
 ```html

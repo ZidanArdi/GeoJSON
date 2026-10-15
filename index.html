@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rute PPM ke ULBI</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: #172033;
+        background: #eef3f8;
+      }
+
+      .page-header {
+        position: relative;
+        z-index: 1000;
+        padding: 1.25rem clamp(1rem, 4vw, 3rem);
+        color: #fff;
+        background: linear-gradient(120deg, #0f766e, #155e75);
+        box-shadow: 0 2px 12px rgb(15 23 42 / 18%);
+      }
+
+      .page-header h1 {
+        margin: 0;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+      }
+
+      .page-header p {
+        margin: 0.35rem 0 0;
+        opacity: 0.88;
+      }
+
+      .map-layout {
+        display: grid;
+        grid-template-columns: minmax(13rem, 17rem) 1fr;
+        height: calc(100vh - 108px);
+        min-height: 30rem;
+      }
+
+      .sidebar {
+        z-index: 900;
+        padding: 1rem;
+        overflow-y: auto;
+        background: #fff;
+        border-right: 1px solid #d8e0e9;
+      }
+
+      .sidebar h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+      }
+
+      .sidebar p {
+        margin: 0 0 1rem;
+        color: #526174;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
+      .legend {
+        display: grid;
+        gap: 0.65rem;
+        margin: 1rem 0;
+        font-size: 0.88rem;
+      }
+
+      .legend-item {
+        display: flex;
+        gap: 0.55rem;
+        align-items: center;
+      }
+
+      .legend-swatch {
+        width: 1.1rem;
+        height: 1.1rem;
+        border: 1px solid rgb(15 23 42 / 25%);
+        border-radius: 0.25rem;
+      }
+
+      .legend-route {
+        width: 1.4rem;
+        height: 0;
+        border-top: 4px solid #e11d48;
+      }
+
+      button {
+        width: 100%;
+        padding: 0.65rem 0.75rem;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        background: #0f766e;
+        border: 0;
+        border-radius: 0.5rem;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #115e59;
+      }
+
+      #map {
+        min-width: 0;
+        min-height: 30rem;
+      }
+
+      .loading {
+        position: absolute;
+        z-index: 1000;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.55rem 0.75rem;
+        color: #334155;
+        background: #fff;
+        border-radius: 0.4rem;
+        box-shadow: 0 2px 10px rgb(15 23 42 / 18%);
+      }
+
+      .loading.error {
+        color: #991b1b;
+        background: #fee2e2;
+      }
+
+      @media (max-width: 700px) {
+        .map-layout {
+          display: flex;
+          flex-direction: column;
+          height: auto;
+        }
+
+        .sidebar {
+          order: 2;
+          border-top: 1px solid #d8e0e9;
+          border-right: 0;
+        }
+
+        #map {
+          height: 65vh;
+          min-height: 24rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>Peta Rute PPM ke ULBI</h1>
+      <p>Visualisasi rute dan bangunan di lingkungan Universitas Logistik dan Bisnis Internasional.</p>
+    </header>
+
+    <main class="map-layout">
+      <aside class="sidebar" aria-label="Informasi peta">
+        <h2>Petunjuk</h2>
+        <p>
+          Klik area gedung atau garis rute untuk melihat informasi. Gunakan kontrol
+          zoom untuk menjelajahi peta.
+        </p>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-route" aria-hidden="true"></span>
+            <span>Rute / lorong</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #60a5fa" aria-hidden="true"></span>
+            <span>Bangunan kampus</span>
+          </div>
+        </div>
+        <button id="fit-route" type="button">Tampilkan seluruh rute</button>
+      </aside>
+      <section id="map" aria-label="Peta rute PPM ke ULBI"></section>
+    </main>
+
+    <div id="loading" class="loading" role="status">Memuat data peta...</div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script>
+      const map = L.map("map", { zoomControl: true });
+      const loading = document.getElementById("loading");
+      const routeLayers = [];
+      let geoJsonLayer;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 21,
+      }).addTo(map);
+
+      function getFeatureName(properties) {
+        return properties.Gedung || properties.nama || "Fitur peta";
+      }
+
+      function getFillColor(properties) {
+        const rgba = properties.fill;
+        const match = typeof rgba === "string" && rgba.match(/rgba?\(([^)]+)\)/i);
+        if (!match) return "#60a5fa";
+
+        const [red, green, blue] = match[1].split(",").map((value) => Number.parseInt(value, 10));
+        return [red, green, blue].every(Number.isFinite)
+          ? `rgb(${red}, ${green}, ${blue})`
+          : "#60a5fa";
+      }
+
+      function styleFeature(feature) {
+        const properties = feature.properties || {};
+        if (feature.geometry.type === "LineString") {
+          return {
+            color: "#e11d48",
+            weight: 5,
+            opacity: 0.9,
+          };
+        }
+
+        return {
+          color: "#1e3a8a",
+          weight: 1,
+          fillColor: getFillColor(properties),
+          fillOpacity: Number(properties["fill-opacity"]) || 0.55,
+        };
+      }
+
+      function onEachFeature(feature, layer) {
+        const properties = feature.properties || {};
+        const name = getFeatureName(properties);
+        layer.bindPopup(`<strong>${name}</strong>`);
+
+        if (feature.geometry.type === "LineString") {
+          routeLayers.push(layer);
+        }
+      }
+
+      fetch("./Peta%20dan%20Rute%20PPM%20-%20ULBI.geojson")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Data GeoJSON tidak dapat dimuat (${response.status}).`);
+          }
+          return response.json();
+        })
+        .then((data) => {
+          geoJsonLayer = L.geoJSON(data, {
+            style: styleFeature,
+            onEachFeature,
+          }).addTo(map);
+
+          const bounds = geoJsonLayer.getBounds();
+          if (bounds.isValid()) map.fitBounds(bounds.pad(0.08));
+          loading.remove();
+        })
+        .catch((error) => {
+          loading.textContent = error.message;
+          loading.classList.add("error");
+          console.error(error);
+        });
+
+      document.getElementById("fit-route").addEventListener("click", () => {
+        const routeBounds = L.featureGroup(routeLayers).getBounds();
+        const bounds = routeBounds.isValid() ? routeBounds : geoJsonLayer?.getBounds();
+        if (bounds?.isValid()) map.fitBounds(bounds.pad(0.15));
+      });
+    </script>
+  </body>
+</html>
